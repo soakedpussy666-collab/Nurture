@@ -1,0 +1,6 @@
+{
+  "name": "Nurture",
+  "description": "Calm, minimal baby tracking for feeding, sleep, and diapers with real-time caregiver sync and LMC midwife care integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

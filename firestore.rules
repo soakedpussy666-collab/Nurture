@@ -1,0 +1,221 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+             data.role in ['parent', 'midwife'] &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 100 &&
+             data.email is string && data.email.size() <= 254 &&
+             (!('babyId' in data) || (data.babyId is string && data.babyId.size() <= 128)) &&
+             (!('quietHoursEnabled' in data) || data.quietHoursEnabled is bool) &&
+             (!('subtleNotifications' in data) || data.subtleNotifications is bool) &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    function isValidBaby(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.birthDate is string && data.birthDate.size() <= 20 &&
+             data.caregiverUids is list && data.caregiverUids.size() > 0 && data.caregiverUids.size() <= 20 &&
+             data.midwifeUids is list && data.midwifeUids.size() <= 20 &&
+             data.inviteCode is string && data.inviteCode.size() > 0 && data.inviteCode.size() <= 32 &&
+             data.lmcInviteCode is string && data.lmcInviteCode.size() > 0 && data.lmcInviteCode.size() <= 32 &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    function isValidBabyLog(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.babyId is string && data.babyId.size() <= 128 &&
+             data.type in ['feeding', 'sleep', 'diaper'] &&
+             data.loggedByUid is string && data.loggedByUid.size() <= 128 &&
+             data.loggedByName is string && data.loggedByName.size() <= 100 &&
+             data.memberUids is list && data.memberUids.size() <= 30 &&
+             (!('feedingType' in data) || (data.feedingType is string && data.feedingType.size() <= 50)) &&
+             (!('amountMl' in data) || data.amountMl is int) &&
+             (!('durationMinutes' in data) || data.durationMinutes is int) &&
+             (!('sleepQuality' in data) || (data.sleepQuality is string && data.sleepQuality.size() <= 50)) &&
+             (!('diaperType' in data) || (data.diaperType is string && data.diaperType.size() <= 50)) &&
+             (!('consistency' in data) || (data.consistency is string && data.consistency.size() <= 100)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             data.timestamp is timestamp &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    function isValidAppointment(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.babyId is string && data.babyId.size() <= 128 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 150 &&
+             data.dateTime is timestamp &&
+             (!('location' in data) || (data.location is string && data.location.size() <= 200)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             data.status in ['scheduled', 'completed', 'rescheduled', 'cancelled'] &&
+             data.createdByUid is string && data.createdByUid.size() <= 128 &&
+             (!('midwifeUid' in data) || (data.midwifeUid is string && data.midwifeUid.size() <= 128)) &&
+             data.memberUids is list && data.memberUids.size() <= 30 &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    function isValidChatMessage(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.babyId is string && data.babyId.size() <= 128 &&
+             data.senderUid is string && data.senderUid.size() <= 128 &&
+             data.senderName is string && data.senderName.size() <= 100 &&
+             data.senderRole in ['parent', 'midwife'] &&
+             data.text is string && data.text.size() > 0 && data.text.size() <= 2000 &&
+             data.memberUids is list && data.memberUids.size() <= 30 &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time;
+    }
+
+    // 1. Users collection
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().createdAt <= request.time &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       request.auth.uid == userId &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'babyId', 'quietHoursEnabled', 'subtleNotifications', 'updatedAt']);
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+    }
+
+    // 2. Babies collection
+    match /babies/{babyId} {
+      allow get: if isSignedIn() && isValidId(babyId);
+      allow list: if isSignedIn() &&
+                     (request.auth.uid in resource.data.caregiverUids || request.auth.uid in resource.data.midwifeUids);
+
+      allow create: if isSignedIn() &&
+                       isValidId(babyId) &&
+                       request.auth.uid in incoming().caregiverUids &&
+                       incoming().createdAt <= request.time &&
+                       isValidBaby(incoming());
+
+      // Update: either existing member or joining caregiver or connecting midwife
+      allow update: if isSignedIn() &&
+                       isValidId(babyId) &&
+                       incoming().id == existing().id &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidBaby(incoming()) &&
+                       (
+                         // Existing caregiver update
+                         (request.auth.uid in existing().caregiverUids &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'birthDate', 'inviteCode', 'lmcInviteCode', 'caregiverUids', 'midwifeUids', 'updatedAt'])) ||
+                         // Caregiver joining via code
+                         (request.auth.uid in incoming().caregiverUids &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['caregiverUids', 'updatedAt'])) ||
+                         // Midwife connecting via code
+                         (request.auth.uid in incoming().midwifeUids &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['midwifeUids', 'updatedAt']))
+                       );
+
+      allow delete: if isSignedIn() && isValidId(babyId) && request.auth.uid in existing().caregiverUids;
+
+      // 3. Baby subcollections: Logs
+      match /logs/{logId} {
+        allow get: if isSignedIn() && isValidId(logId) && request.auth.uid in resource.data.memberUids;
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(logId) &&
+                         request.auth.uid in incoming().memberUids &&
+                         incoming().loggedByUid == request.auth.uid &&
+                         incoming().createdAt <= request.time &&
+                         isValidBabyLog(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(logId) &&
+                         request.auth.uid in existing().memberUids &&
+                         incoming().loggedByUid == existing().loggedByUid &&
+                         incoming().babyId == existing().babyId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidBabyLog(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['feedingType', 'amountMl', 'durationMinutes', 'sleepQuality', 'diaperType', 'consistency', 'notes', 'timestamp', 'memberUids', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(logId) && request.auth.uid in existing().memberUids;
+      }
+
+      // 4. Baby subcollections: Appointments
+      match /appointments/{appointmentId} {
+        allow get: if isSignedIn() && isValidId(appointmentId) && request.auth.uid in resource.data.memberUids;
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(appointmentId) &&
+                         request.auth.uid in incoming().memberUids &&
+                         incoming().createdByUid == request.auth.uid &&
+                         incoming().createdAt <= request.time &&
+                         isValidAppointment(incoming());
+
+        allow update: if isSignedIn() &&
+                         isValidId(appointmentId) &&
+                         request.auth.uid in existing().memberUids &&
+                         incoming().babyId == existing().babyId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidAppointment(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'dateTime', 'location', 'notes', 'status', 'midwifeUid', 'memberUids', 'updatedAt']);
+
+        allow delete: if isSignedIn() && isValidId(appointmentId) && request.auth.uid in existing().memberUids;
+      }
+
+      // 5. Baby subcollections: Messages
+      match /messages/{messageId} {
+        allow get: if isSignedIn() && isValidId(messageId) && request.auth.uid in resource.data.memberUids;
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+
+        allow create: if isSignedIn() &&
+                         isValidId(messageId) &&
+                         request.auth.uid in incoming().memberUids &&
+                         incoming().senderUid == request.auth.uid &&
+                         incoming().createdAt <= request.time &&
+                         isValidChatMessage(incoming());
+
+        allow update: if false; // Messages are immutable
+
+        allow delete: if isSignedIn() && isValidId(messageId) && existing().senderUid == request.auth.uid;
+      }
+    }
+  }
+}

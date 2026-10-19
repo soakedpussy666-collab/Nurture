@@ -1,0 +1,120 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile for a parent or midwife/LMC",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Unique Firebase Auth UID" },
+        "role": { "type": "string", "enum": ["parent", "midwife"], "description": "User role" },
+        "displayName": { "type": "string", "description": "Display name of user" },
+        "email": { "type": "string", "description": "Email address" },
+        "babyId": { "type": "string", "description": "Active baby identifier" },
+        "quietHoursEnabled": { "type": "boolean", "description": "Whether quiet hours notifications are enabled" },
+        "subtleNotifications": { "type": "boolean", "description": "Whether subtle gentle notification style is preferred" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp via serverTimestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp via serverTimestamp" }
+      },
+      "required": ["userId", "role", "displayName", "email", "createdAt", "updatedAt"]
+    },
+    "Baby": {
+      "title": "Baby",
+      "description": "Baby profile shared among parents and accessible to their LMC midwife",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Document ID of baby" },
+        "name": { "type": "string", "description": "Baby name" },
+        "birthDate": { "type": "string", "description": "Date of birth string YYYY-MM-DD" },
+        "caregiverUids": { "type": "array", "description": "List of caregiver UIDs" },
+        "midwifeUids": { "type": "array", "description": "List of connected midwife/LMC UIDs" },
+        "inviteCode": { "type": "string", "description": "Family caregiver invite code" },
+        "lmcInviteCode": { "type": "string", "description": "LMC Midwife connect code" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["id", "name", "caregiverUids", "midwifeUids", "inviteCode", "lmcInviteCode", "createdAt", "updatedAt"]
+    },
+    "BabyLog": {
+      "title": "BabyLog",
+      "description": "Feeding, sleep, or diaper activity record for baby",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique log document ID" },
+        "babyId": { "type": "string", "description": "Parent baby ID" },
+        "type": { "type": "string", "enum": ["feeding", "sleep", "diaper"], "description": "Type of event" },
+        "loggedByUid": { "type": "string", "description": "UID of caregiver who logged this" },
+        "loggedByName": { "type": "string", "description": "Name of caregiver who logged this" },
+        "feedingType": { "type": "string", "description": "breast_left, breast_right, bottle_formula, bottle_milk, solids" },
+        "amountMl": { "type": "integer", "description": "Amount in ml for bottle feeding" },
+        "durationMinutes": { "type": "integer", "description": "Duration in minutes" },
+        "sleepQuality": { "type": "string", "description": "peaceful, restless, contact_nap" },
+        "diaperType": { "type": "string", "description": "wet, dirty, both, dry" },
+        "consistency": { "type": "string", "description": "Diaper stool consistency description" },
+        "notes": { "type": "string", "description": "Optional notes" },
+        "memberUids": { "type": "array", "description": "Authorized member UIDs" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Event timestamp" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["id", "babyId", "type", "loggedByUid", "loggedByName", "memberUids", "timestamp", "createdAt", "updatedAt"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Appointment scheduled between midwife and parents",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Appointment document ID" },
+        "babyId": { "type": "string", "description": "Associated baby ID" },
+        "title": { "type": "string", "description": "Appointment title" },
+        "dateTime": { "type": "string", "format": "date-time", "description": "Appointment time" },
+        "location": { "type": "string", "description": "Visit location" },
+        "notes": { "type": "string", "description": "Visit notes or clinical remarks" },
+        "status": { "type": "string", "enum": ["scheduled", "completed", "rescheduled", "cancelled"], "description": "Status" },
+        "createdByUid": { "type": "string", "description": "Creator UID" },
+        "midwifeUid": { "type": "string", "description": "Assigned Midwife UID" },
+        "memberUids": { "type": "array", "description": "Authorized member UIDs" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["id", "babyId", "title", "dateTime", "status", "createdByUid", "memberUids", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Direct message between parents and their LMC midwife",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Message document ID" },
+        "babyId": { "type": "string", "description": "Baby context ID" },
+        "senderUid": { "type": "string", "description": "Sender UID" },
+        "senderName": { "type": "string", "description": "Sender display name" },
+        "senderRole": { "type": "string", "enum": ["parent", "midwife"], "description": "Sender role" },
+        "text": { "type": "string", "description": "Message text" },
+        "memberUids": { "type": "array", "description": "Authorized member UIDs" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp" }
+      },
+      "required": ["id", "babyId", "senderUid", "senderName", "senderRole", "text", "memberUids", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Individual user profile records"
+    },
+    "/babies/{babyId}": {
+      "schema": "Baby",
+      "description": "Shared baby profiles"
+    },
+    "/babies/{babyId}/logs/{logId}": {
+      "schema": "BabyLog",
+      "description": "Activity logs for feeding, sleep, and diapers"
+    },
+    "/babies/{babyId}/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Midwife and parent appointments"
+    },
+    "/babies/{babyId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Care chat messages between caregivers and LMC midwife"
+    }
+  }
+}
